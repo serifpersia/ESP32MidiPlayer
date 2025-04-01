@@ -1,4 +1,4 @@
-# Arduino Debounce Library
+# ESP32MidiPlayer Arduino Library
 
 [![Arduino Library](https://img.shields.io/badge/Arduino-Library-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
