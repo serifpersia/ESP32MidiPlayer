@@ -12,15 +12,11 @@ ESP32MidiPlayer::~ESP32MidiPlayer() {
 void ESP32MidiPlayer::setLogger(MidiLogLevel level, MidiLogCallback callback) {
     _logLevel = level;
     _logCallback = callback;
-    // Note: Cannot call the const _log from a non-const function directly if it modifies members,
-    // but okay here as setLogger modifies logging config, not playback state.
-    // If _log needed to be non-const, calculateMsPerTick couldn't call it.
+    
     _log(MIDI_LOG_INFO, "Logger initialized with level: %d", level);
 }
 
-// *** ADDED const qualifier here ***
 void ESP32MidiPlayer::_log(MidiLogLevel level, const char* format, ...) const {
-    // Check against the member _logLevel (reading is fine in const function)
     if (level <= _logLevel && level > MIDI_LOG_NONE) {
         char logBuffer[256];
         va_list args;
@@ -28,9 +24,7 @@ void ESP32MidiPlayer::_log(MidiLogLevel level, const char* format, ...) const {
         vsnprintf(logBuffer, sizeof(logBuffer), format, args);
         va_end(args);
 
-        // Using member _logCallback (reading is fine in const function)
         if (_logCallback) {
-            // Calling external callback doesn't violate const-ness of 'this' object
             _logCallback(level, logBuffer);
         } else {
             const char* levelStr;
@@ -43,7 +37,6 @@ void ESP32MidiPlayer::_log(MidiLogLevel level, const char* format, ...) const {
                 case MIDI_LOG_VERBOSE: levelStr = "VERBOSE"; break;
                 default:               levelStr = "UNKNOWN"; break;
             }
-            // Calling external Serial.printf doesn't violate const-ness
             Serial.printf("[MIDI %s] %s\n", levelStr, logBuffer);
         }
     }
@@ -402,14 +395,14 @@ bool ESP32MidiPlayer::refillTrackBuffer(TrackState& track) {
         _log(MIDI_LOG_DEBUG, "Reached track end at offset %u", track.currentOffset);
         track.bufferFill = 0;
         track.bufferPos = 0;
-        // Don't mark finished here, let parseEvent/readVLQ handle EOF condition
+        
         return false;
     }
 
     size_t bytesRead = _midiFile.read(track.buffer, bytesToRead);
     track.bufferFill = bytesRead;
     track.bufferPos = 0;
-    track.currentOffset += bytesRead; // Update offset based on actual read
+    track.currentOffset += bytesRead;
 
     _log(MIDI_LOG_VERBOSE, "Read %u bytes into buffer, new offset=%u", bytesRead, track.currentOffset);
 
@@ -419,7 +412,6 @@ bool ESP32MidiPlayer::refillTrackBuffer(TrackState& track) {
               _log(MIDI_LOG_WARN, "Partial read: %u of %u bytes expected, offset=%u. File end likely reached.",
                    bytesRead, bytesToRead, track.currentOffset);
          }
-         // Don't mark finished here, let consumer handle lack of data
     }
 
     return bytesRead > 0; // Indicate if any bytes were read
@@ -436,10 +428,8 @@ bool ESP32MidiPlayer::readTrackByte(TrackState& track, byte& outByte) {
             // Refill failed (likely EOF or read error)
             if (track.currentOffset >= track.trackChunkEnd && track.bufferFill == 0) {
                  _log(MIDI_LOG_DEBUG, "Track completed at offset %u (EOF detected during readTrackByte)", track.currentOffset);
-                 // Don't mark finished here, let caller (readVLQ/parseEvent) decide based on context
             } else {
                  _log(MIDI_LOG_ERROR, "Buffer refill failed or returned no data at offset %u", track.currentOffset);
-                 // Don't mark finished here, let caller handle parse/read failure
             }
             return false; // Indicate byte could not be read
         }
@@ -496,7 +486,6 @@ float ESP32MidiPlayer::calculateMsPerTick() const {
     if (_ticksPerQuarterNote > 0 && _microsecondsPerQuarterNote > 0) {
         return static_cast<float>(_microsecondsPerQuarterNote) / (_ticksPerQuarterNote * 1000.0f);
     } else {
-        // *** This call is now valid because _log is const ***
         _log(MIDI_LOG_WARN, "Invalid timing division Ticks:%lu usPerQN:%f, using default 120 BPM",
             _ticksPerQuarterNote, _microsecondsPerQuarterNote);
         return 5.208333f; // Default 120 BPM, 96 TPQN
@@ -800,7 +789,7 @@ void ESP32MidiPlayer::update() {
                  nextEventTick, trackIndex, targetMillis, currentMillis);
             break; // Exit the while loop for this update() call
         }
-    } // End while (!_eventQueue.empty())
+    }
 
     // Recalculate active tracks after processing events for this cycle
     size_t currentActive = 0;
