@@ -26,3 +26,8 @@ A MIDI Player library for ESP32 microcontrollers that streams and parses MIDI fi
 Open example project and send playback controls via serial monitor to test midi playback.
 
 - ESP32PartitionTool is recommended to upload test midi file located in data directory inside the example proejct. 
+
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
