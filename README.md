@@ -1,6 +1,10 @@
-# ESP32MidiPlayer Library
+# Arduino Debounce Library
 
-Arduino MIDI player library for ESP32 microcontrollers that streams and parses MIDI files from LittleFS. This library provides real-time MIDI event processing with playback control and logging features.
+[![Arduino Library](https://img.shields.io/badge/Arduino-Library-blue.svg)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)](https://github.com/serifpersia/ESP32MidiPlayer)
+
+A MIDI Player library for ESP32 microcontrollers that streams and parses MIDI files from LittleFS. This library provides real-time MIDI event processing with playback control and logging features.
 
 ## Features
 - Streams MIDI files from LittleFS
@@ -16,7 +20,7 @@ Arduino MIDI player library for ESP32 microcontrollers that streams and parses M
    - Search for "ESP32MidiPlayer" and install it.
 
 ## Dependencies
-- **LittleFS**: Required for file system operations. Install via Arduino Library Manager.
+- **LittleFS**: Required for library compile and file system operations inside your arduino project .ino file. ESP32 Arduino Core must be installed.
 
 ## Usage
 Open example project and send playback controls via serial monitor to test midi playback.
