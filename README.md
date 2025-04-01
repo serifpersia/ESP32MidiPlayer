@@ -2,7 +2,7 @@
 
 [![Arduino Library](https://img.shields.io/badge/Arduino-Library-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)](https://github.com/serifpersia/ESP32MidiPlayer)
+[![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)](https://github.com/serifpersia/ESP32MidiPlayer/releases/latest)
 
 A MIDI Player library for ESP32 microcontrollers that streams and parses MIDI files from LittleFS. This library provides real-time MIDI event processing with playback control and logging features.
 
