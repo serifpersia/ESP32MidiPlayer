@@ -9,30 +9,81 @@
 #include <LittleFS.h>
 #include "ESP32MidiPlayer.h"
 
-ESP32MidiPlayer midiPlayer;
+ESP32MidiPlayer midiPlayer(LittleFS); // Use LittleFS
+
 const char* MIDI_FILE = "/test.mid";
 
-void midiLoggerCallback(MidiLogLevel level, const char* format, ...) {
+
+void handleLog(MidiLogLevel level, const char* message) {
   const char* levelStr = "";
   switch (level) {
-    case MIDI_LOG_NONE:    levelStr = "[NONE] "; break;
-    case MIDI_LOG_FATAL:   levelStr = "[FATAL] "; break;
-    case MIDI_LOG_ERROR:   levelStr = "[ERROR] "; break;
-    case MIDI_LOG_WARN:    levelStr = "[WARN]  "; break;
-    case MIDI_LOG_INFO:    levelStr = "[INFO]  "; break;
-    case MIDI_LOG_DEBUG:   levelStr = "[DEBUG] "; break;
-    case MIDI_LOG_VERBOSE: levelStr = "[VERB]  "; break;
-    default: break;
+    case MidiLogLevel::ERROR:
+      levelStr = "[ERR] "; // Errors that might halt playback or indicate corruption
+      break;
+    case MidiLogLevel::WARN:
+      levelStr = "[WRN] "; // Warnings about unexpected data or potential issues
+      break;
+    case MidiLogLevel::INFO:
+      levelStr = "[INF] "; // General information (playback start/stop, file loaded)
+      break;
+    case MidiLogLevel::DEBUG:
+      levelStr = "[DBG] "; // Detailed debugging steps (event parsing, byte reads)
+      break;
+    case MidiLogLevel::VERBOSE:
+      levelStr = "[VER] "; // Extremely detailed info (often too noisy)
+      break;
+    // case MidiLogLevel::NONE: // No need to handle NONE, the library checks this
+    default:
+      levelStr = "[???] "; // Unknown level? Should not happen.
+      break;
   }
+  // Print the prefix and the message, followed by a newline
+  Serial.printf("%s%s\n", levelStr, message);
+}
 
-  char messageBuffer[256];
-  va_list args;
-  va_start(args, format);
-  vsnprintf(messageBuffer, sizeof(messageBuffer), format, args);
-  va_end(args);
+void handleNoteOn(uint8_t channel, uint8_t note, uint8_t velocity) {
+Serial.printf("[EVT] Note On:  Ch=%u Note=%u Vel=%u (Tick: %lu)\n",
+channel + 1, note, velocity, midiPlayer.getCurrentTick()); // Display channel 1-16
+}
 
-  Serial.print(levelStr);
-  Serial.println(messageBuffer);
+void handleNoteOff(uint8_t channel, uint8_t note, uint8_t velocity) {
+Serial.printf("[EVT] Note Off: Ch=%u Note=%u Vel=%u (Tick: %lu)\n",
+channel + 1, note, velocity, midiPlayer.getCurrentTick()); // Display channel 1-16
+}
+
+void handleControlChange(uint8_t channel, uint8_t controller, uint8_t value) {
+Serial.printf("[EVT] Ctrl Chg: Ch=%u CC=%u Val=%u (Tick: %lu)\n",
+channel + 1, controller, value, midiPlayer.getCurrentTick()); // Display channel 1-16
+}
+
+void handleProgramChange(uint8_t channel, uint8_t program) {
+Serial.printf("[EVT] Prog Chg: Ch=%u Prog=%u (Tick: %lu)\n",
+channel + 1, program, midiPlayer.getCurrentTick()); // Display channel 1-16
+}
+
+void handlePitchBend(uint8_t channel, int16_t value) {
+Serial.printf("[EVT] Pitch Bnd: Ch=%u Val=%d (Tick: %lu)\n",
+channel + 1, value, midiPlayer.getCurrentTick()); // Display channel 1-16
+}
+
+void handleTempoChange(uint32_t microsecondsPerQuarterNote) {
+float bpm = 60000000.0f / microsecondsPerQuarterNote;
+Serial.printf("[EVT] Tempo Chg: %lu us/qn (%.2f BPM) (Tick: %lu)\n",
+microsecondsPerQuarterNote, bpm, midiPlayer.getCurrentTick());
+}
+
+void handleTimeSignature(uint8_t num, uint8_t den_pow2, uint8_t clocks, uint8_t b) {
+Serial.printf("[EVT] Time Sig: %u/%u Clocks=%u 32nds/QN=%u (Tick: %lu)\n",
+num, (1 << den_pow2), clocks, b, midiPlayer.getCurrentTick());
+}
+
+void handleEndOfTrack(uint8_t trackIndex) {
+Serial.printf("[INF] EndOfTrack reached for track %u (Tick: %lu)\n",
+trackIndex, midiPlayer.getCurrentTick());
+}
+
+void handlePlaybackComplete() {
+Serial.println("\n[INF] === Playback Finished ===\n");
 }
 
 void setup() {
@@ -41,21 +92,28 @@ void setup() {
   delay(1000);
 
   Serial.println("Initializing MIDI Player...");
-  
-  if (!midiPlayer.begin()) {
-    Serial.println("Failed to initialize MidiPlayer! Check LittleFS mount.");
-    while (true) delay(1000); // Halt execution
-  }
+
 
   // Enable logging callback (set to info by default)
-  //midiPlayer.setLogger(MIDI_LOG_INFO, midiLoggerCallback);
+  //midiPlayer.setLogCallback(handleLog);
+  //midiPlayer.setLogLevel(MidiLogLevel::INFO);
+
+  midiPlayer.setNoteOnCallback(handleNoteOn);
+  midiPlayer.setNoteOffCallback(handleNoteOff);
+  midiPlayer.setControlChangeCallback(handleControlChange);
+  midiPlayer.setProgramChangeCallback(handleProgramChange);
+  midiPlayer.setPitchBendCallback(handlePitchBend);
+  midiPlayer.setTempoChangeCallback(handleTempoChange);
+  midiPlayer.setTimeSignatureCallback(handleTimeSignature);
+  midiPlayer.setEndOfTrackCallback(handleEndOfTrack);
+  midiPlayer.setPlaybackCompleteCallback(handlePlaybackComplete);
 
   if (!LittleFS.exists(MIDI_FILE)) {
     Serial.printf("MIDI file %s not found in LittleFS!\n", MIDI_FILE);
     while (true) delay(1000);
   }
 
-  if (!midiPlayer.loadFile(MIDI_FILE)) {
+  if (!midiPlayer.load(MIDI_FILE)) {
     Serial.printf("Failed to load MIDI file %s\n", MIDI_FILE);
     while (true) delay(1000);
   }
@@ -68,10 +126,10 @@ void handleSerialCommands() {
     String command = Serial.readStringUntil('\n');
     command.trim();
     
-    MidiPlayerState state = midiPlayer.getState();
+    PlaybackState state = midiPlayer.getState();
     
     if (command.equalsIgnoreCase("play")) {
-      if (state != MidiPlayerState::PLAYING) {
+      if (state != PlaybackState::PLAYING) {
         midiPlayer.play();
         Serial.println("Playback started");
       } else {
@@ -79,23 +137,15 @@ void handleSerialCommands() {
       }
     }
     else if (command.equalsIgnoreCase("pause")) {
-      if (state == MidiPlayerState::PLAYING) {
+      if (state == PlaybackState::PLAYING) {
         midiPlayer.pause();
         Serial.println("Playback paused");
       } else {
         Serial.println("Not playing - cannot pause");
       }
     }
-    else if (command.equalsIgnoreCase("resume")) {
-      if (state == MidiPlayerState::PAUSED) {
-        midiPlayer.resume();
-        Serial.println("Playback resumed");
-      } else {
-        Serial.println("Not paused - cannot resume");
-      }
-    }
     else if (command.equalsIgnoreCase("stop")) {
-      if (state == MidiPlayerState::PLAYING || state == MidiPlayerState::PAUSED) {
+      if (state == PlaybackState::PLAYING || state == PlaybackState::PAUSED) {
         midiPlayer.stop();
         Serial.println("Playback stopped");
       } else {
@@ -109,31 +159,6 @@ void handleSerialCommands() {
 }
 
 void loop() {
-  midiPlayer.update(); // Process MIDI events
+  midiPlayer.tick(); // Process MIDI events
   handleSerialCommands(); // Handle serial input
-
-  // MIDI event handling
-  uint8_t channel, note, velocity, controller, value, program;
-  int bendValue;
-
-  if (midiPlayer.isNoteOn(channel, note, velocity)) {
-    Serial.printf("[MIDI] Note On - Channel: %d, Note: %d, Velocity: %d\n", 
-                  channel, note, velocity);
-  }
-  if (midiPlayer.isNoteOff(channel, note)) {
-    Serial.printf("[MIDI] Note Off - Channel: %d, Note: %d\n", 
-                  channel, note);
-  }
-  if (midiPlayer.isControlChange(channel, controller, value)) {
-    Serial.printf("[MIDI] Control Change - Channel: %d, Controller: %d, Value: %d\n", 
-                  channel, controller, value);
-  }
-  if (midiPlayer.isProgramChange(channel, program)) {
-    Serial.printf("[MIDI] Program Change - Channel: %d, Program: %d\n", 
-                  channel, program);
-  }
-  if (midiPlayer.isPitchBend(channel, bendValue)) {
-    Serial.printf("[MIDI] Pitch Bend - Channel: %d, Value: %d\n", 
-                  channel, bendValue);
-  }
 }
