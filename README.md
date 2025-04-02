@@ -16,7 +16,7 @@ A MIDI Player library for ESP32 microcontrollers that streams and parses MIDI fi
 1. **Manual Installation**:
    - Download latest release zip
    - In the Arduino IDE, go to `Sketch > Include Library > Add .ZIP Library` and select the downloaded file.
-2. **Arduino Library Manager** (once published):
+2. **Arduino Library Manager**:
    - Search for "ESP32MidiPlayer" and install it.
 
 ## Dependencies
